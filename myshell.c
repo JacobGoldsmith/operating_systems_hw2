@@ -25,6 +25,7 @@ int prepare(void){
         fprintf(stderr, "Received error during signal\n");
         exit(1);
     }
+    return 0;
 }
 int finalize(void){
     return 0;
