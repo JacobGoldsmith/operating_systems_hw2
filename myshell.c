@@ -36,7 +36,7 @@ int finalize(void){
 // RETURNS - 1 if should continue, 0 otherwise
 int process_arglist(int count, char** arglist){
     int i;
-    for(i = 0; i <= count; i++){
+    for(i = 0; i < count; i++){
         if(arglist[i][0] == '|'){
             /* Piping */
             return piping(count, arglist, i);
