@@ -13,16 +13,16 @@
 int redirection(int count, char** arglist, int ind_of_seperator);
 int background_command(int count, char** arglist);
 int piping(int count, char** arglist, int ind_of_seperator);
-
+int plain_execution(char** arglist);
 
 // prepare and finalize calls for initialization and destruction of anything required
 int prepare(void){
-    if (SIGINT, SIG_IGN) == SIG_ERR){
-        fprintf(stderr, "%s\n", "Received error during signal");
+    if (signal(SIGINT, SIG_IGN) == SIG_ERR){
+        fprintf(stderr, "Received error during signal\n");
         exit(1);
     }
-    if (SIGCHLD, SIG_IGN) == SIG_ERR){
-        fprintf(stderr, "%s\n", "Received error during signal");
+    if (signal(SIGCHLD, SIG_IGN) == SIG_ERR){
+        fprintf(stderr, "Received error during signal\n");
         exit(1);
     }
 }
@@ -48,17 +48,46 @@ int process_arglist(int count, char** arglist){
             return redirection(count, arglist, i);
         }
     }
+    return plain_execution(arglist);
+}
 
+int plain_execution(char** arglist){
+    int pid = fork();
+    if (pid == 0){
+        /* Child process */
+        if (signal(SIGINT, SIG_DFL) == SIG_ERR){ 
+            fprintf(stderr, "Received signal\n");
+			exit(1);
+		}
+        if(execvp(arglist[0], arglist)){
+                printf("Error!");
+                return -1;
+            }
+    }
+    else if (pid > 0){
+        /* Parent process */
+        waitpid(pid, NULL, 0);
+        return 1;
+    }
+    else{
+        fprintf(stderr, "Received error during fork\n");
+        exit(1);
+    }
+    return 0;
 }
 
 int redirection(int count, char** arglist, int ind_of_seperator){
     int pid = fork();
     if (pid <= 0){
         /* Child process */
+        if (signal(SIGINT, SIG_DFL) == SIG_ERR){ 
+            fprintf(stderr, "Received signal\n");
+			exit(1);
+		}
         int fd = open(arglist[ind_of_seperator + 1], O_RDWR | O_CREAT | O_APPEND, 666);
         dup2(fd, 1);
         arglist[ind_of_seperator] = NULL;
-        if(!execvp(arglist[0], arglist)){
+        if(execvp(arglist[0], arglist)){
                 printf("Error!");
                 return -1;
             }
@@ -66,7 +95,7 @@ int redirection(int count, char** arglist, int ind_of_seperator){
     }
     else{
         /* Parent process */
-        wait(pid);
+        waitpid(pid, NULL, 0);
     }
     return 0;
 }
@@ -82,8 +111,8 @@ int piping(int count, char** arglist, int ind_of_seperator){
         int pid2 = fork();
         if (pid2 > 0){
             /* Parent Process */
-            wait(pid2);
-            wait(pid);
+            waitpid(pid2, NULL, 0);
+            waitpid(pid, NULL, 0);
         }
         else{
             /* The other child process */
@@ -91,7 +120,7 @@ int piping(int count, char** arglist, int ind_of_seperator){
             close(pfds[0]);
             /* instead of stdout, write to the pipe */
             dup2(pfds[1], 1); 
-            if(!execvp(arglist[0], arglist)){
+            if(execvp(arglist[0], arglist)){
                 printf("Error!");
                 return -1;
             }
@@ -99,12 +128,16 @@ int piping(int count, char** arglist, int ind_of_seperator){
         }
     }
     else{
-        /* The child process */
+        /* Child process */
+        if (signal(SIGINT, SIG_DFL) == SIG_ERR){ 
+            fprintf(stderr, "Received signal\n");
+			exit(1);
+		}
         /* This child will execute the second command */
         close(pfds[1]);
         /* instead of stdin, read from the pipe */
         dup2(pfds[0], 0);
-        if(!execvp(arglist[0], (char**)(arglist + ind_of_seperator))){
+        if(execvp(arglist[0], (char**)(arglist + ind_of_seperator))){
                 printf("Error!");
                 return -1;
             }
@@ -117,9 +150,13 @@ int piping(int count, char** arglist, int ind_of_seperator){
 int background_command(int count, char** arglist){
     int pid = fork();
     if (pid <= 0){
-        /* Child Process */
+        /* Child process */
+        if (signal(SIGINT, SIG_DFL) == SIG_ERR){ 
+            fprintf(stderr, "Received signal\n");
+			exit(1);
+		}
         arglist[count] = NULL;
-        if(!execvp(arglist[0], arglist)){
+        if(execvp(arglist[0], arglist)){
                 printf("Error!");
                 return -1;
             }
